@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Auction — Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: transparent;
+    font-family: 'Montserrat', sans-serif;
+    width: 960px;
+    height: 1080px;
+    overflow: hidden;
+  }
+
+  .panel {
+    width: 960px;
+    height: 1080px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 70px 80px;
+    background: transparent;
+  }
+
+  .lot-tag {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 14px;
+    opacity: 0;
+    animation: fadeUp 0.4s ease forwards;
+  }
+
+  .horse-name {
+    font-size: 72px;
+    font-weight: 800;
+    line-height: 1;
+    color: #FFFFFF;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+    margin-bottom: 36px;
+    opacity: 0;
+    animation: fadeUp 0.4s 0.07s ease forwards;
+    word-break: break-word;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+  }
+
+  .pedigree-block {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 48px;
+    opacity: 0;
+    animation: fadeUp 0.4s 0.14s ease forwards;
+  }
+
+  .pedigree-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .pedigree-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.35);
+    min-width: 110px;
+  }
+
+  .pedigree-value {
+    font-size: 18px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.85);
+    text-shadow: 0 1px 10px rgba(0,0,0,0.4);
+  }
+
+  .divider {
+    width: 36px;
+    height: 1px;
+    background: rgba(255,255,255,0.25);
+    margin-bottom: 36px;
+    opacity: 0;
+    animation: fadeIn 0.4s 0.2s ease forwards;
+  }
+
+  .bid-block {
+    opacity: 0;
+    animation: fadeUp 0.4s 0.21s ease forwards;
+  }
+
+  .bid-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.35);
+    margin-bottom: 8px;
+  }
+
+  .bid-eur {
+    font-size: 60px;
+    font-weight: 800;
+    color: #FFFFFF;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+  }
+
+  .bid-eur.flash {
+    animation: bidFlash 0.4s ease;
+  }
+
+  .bid-usd {
+    font-size: 22px;
+    font-weight: 300;
+    color: rgba(255,255,255,0.4);
+    margin-top: 6px;
+    letter-spacing: 0.03em;
+  }
+
+  .previous {
+    margin-top: 32px;
+    font-size: 11px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.2);
+    letter-spacing: 0.08em;
+    line-height: 1.6;
+    opacity: 0;
+    animation: fadeIn 0.4s 0.28s ease forwards;
+  }
+
+  .previous strong {
+    color: rgba(255,255,255,0.35);
+    font-weight: 600;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes bidFlash {
+    0% { transform: scale(1.02); color: #FFD97D; text-shadow: 0 0 30px rgba(255,200,80,0.6); }
+    100% { transform: scale(1); color: #FFFFFF; text-shadow: 0 2px 20px rgba(0,0,0,0.5); }
+  }
+</style>
+</head>
+<body>
+<div class="panel" id="panel">
+  <!-- Populated by JS -->
+</div>
+
+<script>
+  const API = 'https://www.theauction-online.com/francesire/';
+  const INTERVAL = 3000;
+  let lastLot = null;
+  let lastBid = null;
+
+  function fmt(n) {
+    return new Intl.NumberFormat('fr-FR').format(n);
+  }
+
+  function getAge(bd) {
+    if (!bd) return null;
+    return new Date().getFullYear() - new Date(bd).getFullYear();
+  }
+
+  function render(data) {
+    const panel = document.getElementById('panel');
+    const isActive = data.lot && data.lot !== '0' && data.name;
+
+    if (!isActive) {
+      panel.innerHTML = '';
+      return;
+    }
+
+    const isNewLot = data.lot !== lastLot;
+    if (isNewLot) lastLot = data.lot;
+
+    const montants = data.montants || [];
+    const sorted = [...montants].sort((a, b) => (b.montant || 0) - (a.montant || 0));
+    const top = sorted[0];
+    const topEur = top ? top.montant : null;
+    const topUsd = top ? top.usd : null;
+
+    const isNewBid = topEur !== lastBid;
+    if (isNewBid) lastBid = topEur;
+
+    const age = getAge(data.birthdate);
+
+    let meta = `Lot ${data.lot}`;
+    if (age) meta += ` · ${age} ans`;
+    if (data.studbook) meta += ` · ${data.studbook}`;
+
+    let prevHtml = '';
+    if (data.precedent && data.precedent.lot && data.precedent.montants) {
+      prevHtml = `<div class="previous">Lot ${data.precedent.lot} adjugé — <strong>EUR ${fmt(data.precedent.montants.eur)}</strong></div>`;
+    }
+
+    panel.innerHTML = `
+      <div class="lot-tag">${meta}</div>
+      <div class="horse-name">${data.name}</div>
+      <div class="pedigree-block">
+        ${data.sire ? `<div class="pedigree-row"><span class="pedigree-label">Père</span><span class="pedigree-value">${data.sire}</span></div>` : ''}
+        ${data.dam ? `<div class="pedigree-row"><span class="pedigree-label">Mère</span><span class="pedigree-value">${data.dam}</span></div>` : ''}
+        ${data.damsire ? `<div class="pedigree-row"><span class="pedigree-label">Père de mère</span><span class="pedigree-value">${data.damsire}</span></div>` : ''}
+      </div>
+      <div class="divider"></div>
+      <div class="bid-block">
+        <div class="bid-label">Enchère en cours</div>
+        <div class="bid-eur ${isNewBid && !isNewLot ? 'flash' : ''}">EUR ${topEur ? fmt(topEur) : '—'}</div>
+        <div class="bid-usd">USD ${topUsd ? fmt(topUsd) : '—'}</div>
+      </div>
+      ${prevHtml}
+    `;
+  }
+
+  async function fetchData() {
+    try {
+      const r = await fetch(API + '?t=' + Date.now());
+      const d = await r.json();
+      render(d);
+    } catch(e) { console.error(e); }
+  }
+
+  fetchData();
+  setInterval(fetchData, INTERVAL);
+</script>
+</body>
+</html>
